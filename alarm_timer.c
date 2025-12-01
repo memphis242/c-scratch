@@ -49,7 +49,7 @@ int main(int argc, char * argv[])
    if ( *endptr != '\0' )
    {
       fprintf( stderr,
-               "Invalid time argument: %s. strtol() detected invalid char at %td : %c",
+               "Invalid time argument: %s. strtol() detected invalid char at string idx %td : '%c'\n",
                argv[1], (ptrdiff_t)(endptr - argv[1]), *endptr );
 
       return (int)MAIN_RETCODE_MALFORMED_ARG;
@@ -66,8 +66,7 @@ int main(int argc, char * argv[])
    // Register signal handler
    struct sigaction sa_cfg;
    memset(&sa_cfg, 0x00, sizeof sa_cfg);
-   sigemptyset(&sa_cfg.sa_mask);
-   sa_cfg.sa_flags = 0; // defaults, including no SA_RESTART
+   sa_cfg.sa_handler = handleSIGALRM;
    int retcode = sigaction(SIGALRM, &sa_cfg, NULL);
    if ( retcode != SIGACTION_SUCCESS )
    {
@@ -79,19 +78,49 @@ int main(int argc, char * argv[])
 
    // Start the timer!
    (void)alarm(seconds); // return value doesn't matter...
-
-   // Alarm
    while ( !bAlarm ); // wait for SIGALRM...
-   retcode = printf("\a");
-   if ( retcode < 0 )
+
+   // Alarm Time!
+   // Unfortunately, the '\a' tone is the water drop sound effect, which is hard to notice...
+   //retcode = printf("\a");
+   //fflush(stdout);
+   //if ( retcode < 0 )
+   //{
+   //   fprintf( stderr,
+   //            "Failed to trigger alarm! errno: %s (%d)\n",
+   //            strerror(errno), errno );
+
+   //   return MAIN_RETCODE_FAILED_TO_ALARM;
+   //}
+
+   // So instead, I'll invoke a shell cmd as a convenient alternative to play a .wav sound file...
+   retcode = system("ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav");
+   if ( retcode == -1 )
    {
       fprintf( stderr,
-               "Failed to trigger alarm! errno: %s (%d)\n",
+               "system(\"ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav\"): "
+               "Child process could not be created or status could not be retrieved. errno: %s (%d)\n",
                strerror(errno), errno );
 
       return MAIN_RETCODE_FAILED_TO_ALARM;
    }
-   fflush(stdout);
+
+#  ifdef DEBUG
+   if ( WIFEXITED(retcode) )
+   {
+      printf( "system() exited /w status: %d\n", WEXITSTATUS(retcode) );
+   }
+#  endif
+
+   else if ( WIFSIGNALED(retcode) )
+   {
+      fprintf( stderr, "system() interrupted by signal %d\n", WTERMSIG(retcode) );
+      return MAIN_RETCODE_FAILED_TO_ALARM;
+   }
+   else if ( !WIFEXITED(retcode) )
+   {
+      fprintf( stderr, "system() failed somehow... Returned: %d\n", retcode );
+   }
 
    return (int)MAIN_RETCODE_FINE;
 }
