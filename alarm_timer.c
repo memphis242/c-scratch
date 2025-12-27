@@ -32,15 +32,17 @@ enum MainRetCode
 
 int main(int argc, char * argv[])
 {
-   // Check argument count correctness
+   // Check argument correctness
    if ( argc != 2 )
    {
-      fprintf( stderr, "Need to pass in a time argument in seconds. Please try again.\n");
+      fprintf( stderr,
+               "Need to pass in a time argument in seconds.\n"
+               "Please try again.\n" );
       return (int)MAIN_RETCODE_MISSING_ARGS;
    }
 
-   // Attempt to parse time argument
    const size_t arglen = strlen(argv[1]);
+   // It'd be weird if the terminal passed in just "\0" for argv[1]
    assert(arglen > 0);
 
    // Attempt to parse time argument
@@ -59,8 +61,10 @@ int main(int argc, char * argv[])
    if ( *endptr != '\0' )
    {
       fprintf( stderr,
-               "Invalid time argument: %s. strtol() detected invalid char at string idx %td : '%c'\n",
-               argv[1], (ptrdiff_t)(endptr - argv[1]), *endptr );
+               "Error: Invalid time argument: %s\n"
+               "strtol() detected an invalid char at string idx %td : '%c'\n",
+               argv[1],
+               (ptrdiff_t)(endptr - argv[1]), *endptr );
 
       return (int)MAIN_RETCODE_MALFORMED_ARG;
    }
@@ -92,8 +96,9 @@ int main(int argc, char * argv[])
    (void)alarm(seconds); // return value doesn't matter...
    while ( !bAlarm ); // wait for SIGALRM...
 
-   // Alarm Time!
-   // Unfortunately, the '\a' tone is the water drop sound effect, which is hard to notice...
+   // ------------------------------ Alarm Time! ------------------------------
+   // Unfortunately, the '\a' tone is brief and frequently heard sound, which is
+   // makes it harder to notice...
    //retcode = printf("\a");
    //fflush(stdout);
    //if ( retcode < 0 )
@@ -105,7 +110,8 @@ int main(int argc, char * argv[])
    //   return MAIN_RETCODE_FAILED_TO_ALARM;
    //}
 
-   // So instead, I'll invoke a shell cmd as a convenient alternative to play a .wav sound file...
+   // ... so instead, I'll invoke a shell cmd as a convenient alternative to
+   // play a .wav sound file...
    retcode = system("ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav");
    if ( retcode == -1 )
    {
