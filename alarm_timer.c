@@ -42,10 +42,20 @@ int main(int argc, char * argv[])
    // Attempt to parse time argument
    const size_t arglen = strlen(argv[1]);
    assert(arglen > 0);
-   char * endptr = argv[1] + arglen;
+
+   // Attempt to parse time argument
+   // Slight quirk /w strtol(): 0, LONG_MIN, and LONG_MAX may technically be
+   // returned on fully valid input and invalid input, so, in order to clear
+   // away any ambiguity, errno should be reset and then if 0, LONG_MIN, or
+   // LONG_MAX are returned, errno can be checked for `ERANGE`
+   errno = 0;
+   char * endptr = nullptr;
    const long int seconds = strtol( argv[1], &endptr, 10 );
+
+   // At this point, endptr should definitely be within certain bounds...
    assert( endptr >= argv[1] );
    assert( endptr <= argv[1] + arglen );
+
    if ( *endptr != '\0' )
    {
       fprintf( stderr,
@@ -54,11 +64,13 @@ int main(int argc, char * argv[])
 
       return (int)MAIN_RETCODE_MALFORMED_ARG;
    }
-   else if ( LONG_MIN == seconds || LONG_MAX == seconds )
+   else if ( ERANGE == errno )
    {
       fprintf( stderr,
-               "Time amount out-of-bounds: %s. strtol() returned: %ld. errno: %s (%d)\n",
-               argv[1], seconds, strerror(errno), errno );
+               "Error: Time amount out-of-bounds: %s\n"
+               "strtol() returned: %ld. errno: %s (%d)\n",
+               argv[1],
+               seconds, strerror(errno), errno );
 
       return (int)MAIN_RETCODE_TIME_OOB;
    }
