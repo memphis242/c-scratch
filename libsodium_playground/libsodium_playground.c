@@ -525,6 +525,12 @@ int main(void)
          }
       }
 
+      else if ( strcmp(cmd, "verifykey") == 0 )
+      {
+         // TODO
+         (void)printf("Not implemented yet.\n");
+      }
+
       else if ( strcmp(cmd, "encryptmsg") == 0 )
       {
          // TODO
