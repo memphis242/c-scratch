@@ -33,6 +33,10 @@ int main(void)
    char passphrase[50] = {0};
    uint8_t * key = nullptr;
    size_t keysz = 0;
+   char * b64 = nullptr;
+   size_t b64sz = 0;
+   char * hex = nullptr;
+   size_t hexsz = 0;
    uint8_t * salt = nullptr;
    size_t saltsz = 0;
 
@@ -152,11 +156,12 @@ int main(void)
       {
          if ( msg == nullptr )
          {
-            (void)fprintf(stderr, "Error: No msg present.\n");
+            (void)fprintf(stderr, "No msg present. Aborting cmd...\n");
             continue;
          }
 
-         IsNulTerminated(msg);
+         assert(IsNulTerminated(msg));
+
          (void)printf("%s\n", msg);
       }
 
@@ -194,6 +199,10 @@ int main(void)
          (void)printf("Generating new encryption key using default libsodium KDF"
                       " for XChaCha20Poly1305_IETF AEAD cipher...\n");
 
+         // We will override previous stores
+         free(salt);
+         free(key);
+
          saltsz = crypto_pwhash_SALTBYTES;
          salt = malloc(saltsz);
          keysz = crypto_aead_xchacha20poly1305_ietf_KEYBYTES;
@@ -216,11 +225,28 @@ int main(void)
          }
 
          (void)printf("Successfully generated new encryption key.\n");
-         
+
+         // Save the hex encoding for later printing
+         hexsz= keysz * 2 + 1;
+         hex = malloc( hexsz * sizeof(char) );
+         (void)sodium_bin2hex( hex, hexsz,
+                               key, keysz );
+
+         // Save the base64 encoding for later printing
+         constexpr int b64variant = sodium_base64_VARIANT_ORIGINAL;
+         b64sz= sodium_base64_ENCODED_LEN(keysz, b64variant);
+         b64 = malloc( b64sz * sizeof(char) );
+         (void)sodium_bin2base64( b64, b64sz,
+                                  key, keysz,
+                                  b64variant );
+
+         // Write the raw binary key to a file for later viewing
          char testkey_filename[ sizeof("./testkey") + 1 + sizeof(".bin") ] = {0};
          (void)strcat(testkey_filename, "./testkey");
          (void)strcat(testkey_filename, (char[]){filecounter, '\0'});
          (void)strcat(testkey_filename, ".bin");
+         assert(IsNulTerminated(testkey_filename));
+
          FILE * fd = fopen(testkey_filename, "wb");
          if ( fd == nullptr )
          {
@@ -233,19 +259,21 @@ int main(void)
             continue;
          }
 
-         size_t nwritten = fwrite(key,
-                                 1 /* element sz */,
-                                 keysz /* n items */,
-                                 fd);
-         if ( nwritten != keysz )
          {
-            fprintf( stderr,
-               "Error: Failed to write all the bytes of the key to %s\n"
-               "Wrote only %zu bytes out of %zu (%zu bytes short)\n"
-               "errno: %s (%d): %s\n",
-               testkey_filename,
-               nwritten, (size_t)keysz, (size_t)(keysz) - nwritten,
-               strerrorname_np(errno), errno, strerror(errno) );
+            size_t nwritten = fwrite( key,
+                                      1 /* element sz */,
+                                      keysz /* n items */,
+                                      fd );
+            if ( nwritten != keysz )
+            {
+               fprintf( stderr,
+                  "Error: Failed to write all the bytes of the key to %s\n"
+                  "Wrote only %zu bytes out of %zu (%zu bytes short)\n"
+                  "errno: %s (%d): %s\n",
+                  testkey_filename,
+                  nwritten, keysz, keysz - nwritten,
+                  strerrorname_np(errno), errno, strerror(errno) );
+            }
          }
 
          rc = fclose(fd);
@@ -260,31 +288,130 @@ int main(void)
 
             continue;
          }
-      }
 
-      else if ( strcmp(cmd, "printciphertxt") == 0 )
-      {
-         if ( ciphertxt == nullptr )
+         // Repeat for text encodings
+         assert(IsNulTerminated(testkey_filename));
+         testkey_filename[ strlen(testkey_filename) - sizeof("bin") + 1 ] = '\0';
+         (void)strcat(testkey_filename, "hex");
+
+         fd = fopen(testkey_filename, "w");
+         if ( fd == nullptr )
          {
-            (void)fprintf(stderr, "Error: No cipher text present.\n");
+            fprintf( stderr,
+               "Error: Failed to open file %s\n"
+               "fopen() returned nullptr, errno: %s (%d): %s\n",
+               testkey_filename,
+               strerrorname_np(errno), errno, strerror(errno) );
+
             continue;
          }
 
-         IsNulTerminated(ciphertxt);
-         (void)printf("%s\n", ciphertxt);
+         {
+            int nwritten = fprintf( fd, "%s", hex );
+            if ( nwritten != ((int)hexsz - 1) )
+            {
+               fprintf( stderr,
+                  "Error: Failed to write all the bytes of the hex encoding to %s\n"
+                  "Wrote only %d bytes out of %zu (%d bytes short)\n"
+                  "errno: %s (%d): %s\n",
+                  testkey_filename,
+                  nwritten, hexsz, (int)hexsz - nwritten,
+                  strerrorname_np(errno), errno, strerror(errno) );
+            }
+         }
+
+         rc = fclose(fd);
+         if ( rc != 0 )
+         {
+            // TODO: Consider checking if errno was EINTR?
+            fprintf( stderr,
+               "Error: Failed to open file %s\n"
+               "fopen() returned nullptr, errno: %s (%d): %s\n",
+               testkey_filename,
+               strerrorname_np(errno), errno, strerror(errno) );
+
+            continue;
+         }
+
+         testkey_filename[ strlen(testkey_filename) - sizeof("hex") + 1 ] = '\0';
+         (void)strcat(testkey_filename, "b64");
+
+         fd = fopen(testkey_filename, "w");
+         if ( fd == nullptr )
+         {
+            fprintf( stderr,
+               "Error: Failed to open file %s\n"
+               "fopen() returned nullptr, errno: %s (%d): %s\n",
+               testkey_filename,
+               strerrorname_np(errno), errno, strerror(errno) );
+
+            continue;
+         }
+
+         {
+            int nwritten = fprintf( fd, "%s", b64 );
+            if ( nwritten != ((int)b64sz - 1) )
+            {
+               fprintf( stderr,
+                  "Error: Failed to write all the bytes of the base64 encoding to %s\n"
+                  "Wrote only %d bytes out of %zu (%d bytes short)\n"
+                  "errno: %s (%d): %s\n",
+                  testkey_filename,
+                  nwritten, b64sz, (int)b64sz - nwritten,
+                  strerrorname_np(errno), errno, strerror(errno) );
+            }
+         }
+
+         rc = fclose(fd);
+         if ( rc != 0 )
+         {
+            // TODO: Consider checking if errno was EINTR?
+            fprintf( stderr,
+               "Error: Failed to open file %s\n"
+               "fopen() returned nullptr, errno: %s (%d): %s\n",
+               testkey_filename,
+               strerrorname_np(errno), errno, strerror(errno) );
+
+            continue;
+         }
+
+         filecounter++;
       }
 
       else if ( strcmp(cmd, "printkey") == 0 )
       {
-         if ( key == nullptr || keysz == 0 )
+         assert( (key != nullptr && keysz > 0)
+                 || (key == nullptr && keysz == 0) );
+         assert( (hex != nullptr && hexsz > 0)
+                 || (hex == nullptr && hexsz == 0) );
+
+         if ( key == nullptr )
          {
-            (void)fprintf(stderr, "Error: No key present.\n");
+            (void)fprintf(stderr, "No key present. Aborting cmd...\n");
             continue;
          }
 
-         // TODO
-         (void)printf("Not implemented yet.\n");
-         //(void)printf("%s\n", ciphertxt);
+         if ( hex == nullptr )
+         {
+            (void)fprintf(stderr, "No hex encoding present, skipping.\n");
+         }
+         else
+         {
+            assert(IsNulTerminated(hex));
+
+            (void)printf("Hex: %s\n", hex);
+         }
+
+         if ( b64 == nullptr )
+         {
+            (void)fprintf(stderr, "No base64 encoding present, skipping.\n");
+         }
+         else
+         {
+            assert(IsNulTerminated(hex));
+
+            (void)printf("Base64: %s\n", b64);
+         }
       }
 
       else if ( strcmp(cmd, "encryptmsg") == 0 )
@@ -297,6 +424,22 @@ int main(void)
       {
          // TODO
          (void)printf("Not implemented yet.\n");
+      }
+
+      else if ( strcmp(cmd, "printciphertxt") == 0 )
+      {
+         if ( ciphertxt == nullptr )
+         {
+            (void)fprintf(stderr, "Error: No cipher text present.\n");
+            continue;
+         }
+
+         if ( !IsNulTerminated(ciphertxt) )
+         {
+            (void)fprintf(stderr, "ciphertxt is not terminated. Aborting cmd...\n");
+            continue;
+         }
+         (void)printf("%s\n", ciphertxt);
       }
 
       else if ( strcmp(cmd, "storemsg") == 0 )
@@ -346,6 +489,8 @@ int main(void)
    free(ciphertxt);
    free(key);
    free(salt);
+   free(b64);
+   free(hex);
    // Close any files that we opened...
    // TODO
 
