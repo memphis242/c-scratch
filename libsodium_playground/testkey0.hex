@@ -1,0 +1,6 @@
+Original Passphrase: 12345
+Salt: 3cf04af2690a8ecf9b55fc8ddac96c64
+KDF Algorithm: crypto_pwhash_ALG_DEFAULT (2)
+KDF Ops Limit: crypto_pwhash_OPSLIMIT_SENSITIVE (4)
+KDF Mem LImit: crypto_pwhash_MEMLIMIT_SENSITIVE (1073741824)
+Key Encoding: e28da526493d3e2ed7b0ed41f69a114b08d9448d39d2737c57a407825b117e96

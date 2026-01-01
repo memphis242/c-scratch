@@ -31,7 +31,7 @@
 !_TAG_PARSER_VERSION!C	1.1	/current.age/
 !_TAG_PARSER_VERSION!Sh	0.0	/current.age/
 !_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
-!_TAG_PROC_CWD	/home/abdullaalmosalmi/git/scratchpad/	//
+!_TAG_PROC_CWD	/home/abdullaalmosalmi/git/scratchpad/libsodium_playground/	//
 !_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
 !_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
 !_TAG_PROGRAM_URL	https://ctags.io/	/official site/
@@ -43,20 +43,8 @@
 !_TAG_ROLE_DESCRIPTION!C!struct	foreigndecl	/declared in foreign languages/
 !_TAG_ROLE_DESCRIPTION!Sh!heredoc	endmarker	/end marker/
 !_TAG_ROLE_DESCRIPTION!Sh!script	loaded	/loaded/
-IsNulTerminated	libsodium_playground/libsodium_playground.c	/^static bool IsNulTerminated(char * str)$/;"	f	typeref:typename:bool	file:
-MAIN_RETCODE_FAILED_TO_ALARM	alarm_timer.c	/^   MAIN_RETCODE_FAILED_TO_ALARM,$/;"	e	enum:MainRetCode	file:
-MAIN_RETCODE_FINE	alarm_timer.c	/^   MAIN_RETCODE_FINE,$/;"	e	enum:MainRetCode	file:
-MAIN_RETCODE_MALFORMED_ARG	alarm_timer.c	/^   MAIN_RETCODE_MALFORMED_ARG,$/;"	e	enum:MainRetCode	file:
-MAIN_RETCODE_MISSING_ARGS	alarm_timer.c	/^   MAIN_RETCODE_MISSING_ARGS,$/;"	e	enum:MainRetCode	file:
-MAIN_RETCODE_SIGACTION_FAILED	alarm_timer.c	/^   MAIN_RETCODE_SIGACTION_FAILED,$/;"	e	enum:MainRetCode	file:
-MAIN_RETCODE_TIME_OOB	alarm_timer.c	/^   MAIN_RETCODE_TIME_OOB,$/;"	e	enum:MainRetCode	file:
-MAX_STRING_SZ	libsodium_playground/libsodium_playground.c	/^constexpr size_t MAX_STRING_SZ = 10'000;$/;"	v	typeref:typename:constexpr size_t
-MainRetCode	alarm_timer.c	/^enum MainRetCode$/;"	g	file:
-SIGACTION_SUCCESS	alarm_timer.c	/^constexpr int SIGACTION_SUCCESS = 0;$/;"	v	typeref:typename:constexpr int
-bAlarm	alarm_timer.c	/^static volatile sig_atomic_t bAlarm = false;$/;"	v	typeref:typename:volatile sig_atomic_t	file:
-bUserEndedSession	libsodium_playground/libsodium_playground.c	/^static volatile sig_atomic_t bUserEndedSession = false;$/;"	v	typeref:typename:volatile sig_atomic_t	file:
-handleSIGALRM	alarm_timer.c	/^void handleSIGALRM(int signum)$/;"	f	typeref:typename:void
-handleSIGINT	libsodium_playground/libsodium_playground.c	/^static void handleSIGINT(int signum)$/;"	f	typeref:typename:void	file:
-main	alarm_timer.c	/^int main(int argc, char * argv[])$/;"	f	typeref:typename:int
-main	libsodium_playground/libsodium_playground.c	/^int main(void)$/;"	f	typeref:typename:int
-main	main.c	/^int main(void)$/;"	f	typeref:typename:int
+IsNulTerminated	libsodium_playground.c	/^static bool IsNulTerminated(char * str)$/;"	f	typeref:typename:bool	file:
+MAX_STRING_SZ	libsodium_playground.c	/^constexpr size_t MAX_STRING_SZ = 10'000;$/;"	v	typeref:typename:constexpr size_t
+bUserEndedSession	libsodium_playground.c	/^static volatile sig_atomic_t bUserEndedSession = false;$/;"	v	typeref:typename:volatile sig_atomic_t	file:
+handleSIGINT	libsodium_playground.c	/^static void handleSIGINT(int signum)$/;"	f	typeref:typename:void	file:
+main	libsodium_playground.c	/^int main(void)$/;"	f	typeref:typename:int

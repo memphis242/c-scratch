@@ -144,7 +144,9 @@ int main(void)
          msg = malloc( (size_t)(msgsz) * sizeof(char) );
          if ( msg == nullptr )
          {
-            (void)fprintf( stderr, "Error: Couldn't malloc() a buffer for msg\n" );
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %ti bytes for a buffer for msg\n",
+                     msgsz);
             continue;
          }
          (void)memcpy( msg, buf, (size_t)msgsz );
@@ -205,16 +207,69 @@ int main(void)
 
          saltsz = crypto_pwhash_SALTBYTES;
          salt = malloc(saltsz);
+         if ( salt == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for salt\n",
+                     saltsz);
+            continue;
+         }
          keysz = crypto_aead_xchacha20poly1305_ietf_KEYBYTES;
          key = malloc(keysz);
+         if ( key == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for key\n",
+                     keysz);
+            continue;
+         }
 
          randombytes_buf(salt, saltsz);
+
+         // Print salt to console
+         size_t salthexsz = saltsz * 2 + 1;
+         char * salthex = malloc( salthexsz * sizeof(char) );
+         if ( salthex == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for hex encoding of salt\n",
+                     salthexsz);
+            continue;
+         }
+         (void)sodium_bin2hex( salthex, salthexsz,
+                               salt, saltsz );
+
+         constexpr int b64variant = sodium_base64_VARIANT_ORIGINAL;
+         size_t saltb64sz = sodium_base64_ENCODED_LEN(saltsz, b64variant);
+         char * saltb64 = malloc( saltb64sz * sizeof(char) );
+         if ( saltb64 == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for base64 encoding of salt\n",
+                     saltb64sz);
+            // FIXME: Need to free previous allocations before continue'ing
+            continue;
+         }
+         (void)sodium_bin2base64( saltb64, saltb64sz,
+                                  salt, saltsz,
+                                  b64variant );
+
+         (void)printf("Using salt:\n"
+                      "- b64: %s\n"
+                      "- hex: %s\n",
+                      saltb64, salthex );
+
+         unsigned long long int opslimit = crypto_pwhash_OPSLIMIT_SENSITIVE;
+         char opslimitstr[] = "crypto_pwhash_OPSLIMIT_SENSITIVE";
+         size_t memlimit = crypto_pwhash_MEMLIMIT_SENSITIVE;
+         char memlimitstr[] = "crypto_pwhash_MEMLIMIT_SENSITIVE";
+         int alg = crypto_pwhash_ALG_DEFAULT;
+         char algstr[] = "crypto_pwhash_ALG_DEFAULT";
+
          sodiumrc = crypto_pwhash( key, keysz,
                                    passphrase, strnlen(passphrase, sizeof passphrase),
                                    salt,
-                                   crypto_pwhash_OPSLIMIT_SENSITIVE,
-                                   crypto_pwhash_MEMLIMIT_SENSITIVE,
-                                   crypto_pwhash_ALG_DEFAULT );
+                                   opslimit, memlimit, alg );
          if ( sodiumrc != 0 )
          {
             (void)fprintf( stderr,
@@ -226,21 +281,49 @@ int main(void)
 
          (void)printf("Successfully generated new encryption key.\n");
 
-         // Save the hex encoding for later printing
+         // Save the hex encoding (both salt and key) for later printing
          hexsz= keysz * 2 + 1;
          hex = malloc( hexsz * sizeof(char) );
+         if ( hex == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for hex encoding of key\n",
+                     hexsz);
+            continue;
+         }
          (void)sodium_bin2hex( hex, hexsz,
                                key, keysz );
 
-         // Save the base64 encoding for later printing
-         constexpr int b64variant = sodium_base64_VARIANT_ORIGINAL;
+         // Same for base64 encoding
          b64sz= sodium_base64_ENCODED_LEN(keysz, b64variant);
          b64 = malloc( b64sz * sizeof(char) );
+         if ( b64 == nullptr )
+         {
+            (void)fprintf( stderr,
+                     "Error: Couldn't malloc() %zu bytes for a buffer for base64 encoding of key\n",
+                     b64sz);
+            continue;
+         }
          (void)sodium_bin2base64( b64, b64sz,
                                   key, keysz,
                                   b64variant );
 
+         assert(key != nullptr);
+         assert(keysz > 0);
+         assert(hex != nullptr);
+         assert(hexsz > 0);
+         assert(b64 != nullptr);
+         assert(b64sz > 0);
+         assert(IsNulTerminated(hex));
+         assert(IsNulTerminated(b64));
+
+         (void)printf("- hex: %s\n", hex);
+         (void)printf("- b64: %s\n", b64);
+
+         (void)printf("Writing key data to files...\n");
+
          // Write the raw binary key to a file for later viewing
+         // TODO: Figure out how you should store salt, KDF alg, and KDF parms
          char testkey_filename[ sizeof("./testkey") + 1 + sizeof(".bin") ] = {0};
          (void)strcat(testkey_filename, "./testkey");
          (void)strcat(testkey_filename, (char[]){filecounter, '\0'});
@@ -279,6 +362,8 @@ int main(void)
          rc = fclose(fd);
          if ( rc != 0 )
          {
+            assert(errno != EINTR); // Assert this because I should have set the
+                                    // SA_RESTART flag for the SIGINT handler
             // TODO: Consider checking if errno was EINTR?
             fprintf( stderr,
                "Error: Failed to open file %s\n"
@@ -307,22 +392,34 @@ int main(void)
          }
 
          {
-            int nwritten = fprintf( fd, "%s", hex );
-            if ( nwritten != ((int)hexsz - 1) )
+            int nwritten = fprintf( fd,
+                              "Original Passphrase: %s\n"
+                              "Salt: %s\n"
+                              "KDF Algorithm: %s (%d)\n"
+                              "KDF Ops Limit: %s (%llu)\n"
+                              "KDF Mem LImit: %s (%zu)\n"
+                              "Key Encoding: %s\n",
+                              passphrase, salthex,
+                              algstr, alg,
+                              opslimitstr, opslimit,
+                              memlimitstr, memlimit,
+                              hex );
+
+            if ( nwritten < 0 )
             {
                fprintf( stderr,
-                  "Error: Failed to write all the bytes of the hex encoding to %s\n"
-                  "Wrote only %d bytes out of %zu (%d bytes short)\n"
+                  "Error: fprintf() of hex encodings to %s failed\n"
                   "errno: %s (%d): %s\n",
                   testkey_filename,
-                  nwritten, hexsz, (int)hexsz - nwritten,
                   strerrorname_np(errno), errno, strerror(errno) );
             }
          }
+         free(salthex);
 
          rc = fclose(fd);
          if ( rc != 0 )
          {
+            assert(errno != EINTR);
             // TODO: Consider checking if errno was EINTR?
             fprintf( stderr,
                "Error: Failed to open file %s\n"
@@ -349,22 +446,34 @@ int main(void)
          }
 
          {
-            int nwritten = fprintf( fd, "%s", b64 );
-            if ( nwritten != ((int)b64sz - 1) )
+            int nwritten = fprintf( fd,
+                              "Original Passphrase: %s\n"
+                              "Salt: %s\n"
+                              "KDF Algorithm: %s (%d)\n"
+                              "KDF Ops Limit: %s (%llu)\n"
+                              "KDF Mem LImit: %s (%zu)\n"
+                              "Key Encoding: %s\n",
+                              passphrase, saltb64,
+                              algstr, alg,
+                              opslimitstr, opslimit,
+                              memlimitstr, memlimit,
+                              b64 );
+
+            if ( nwritten < 0 )
             {
                fprintf( stderr,
-                  "Error: Failed to write all the bytes of the base64 encoding to %s\n"
-                  "Wrote only %d bytes out of %zu (%d bytes short)\n"
+                  "Error: fprintf() of base64 encodings to %s failed\n"
                   "errno: %s (%d): %s\n",
                   testkey_filename,
-                  nwritten, b64sz, (int)b64sz - nwritten,
                   strerrorname_np(errno), errno, strerror(errno) );
             }
          }
+         free(saltb64);
 
          rc = fclose(fd);
          if ( rc != 0 )
          {
+            assert(errno != EINTR);
             // TODO: Consider checking if errno was EINTR?
             fprintf( stderr,
                "Error: Failed to open file %s\n"
@@ -374,6 +483,8 @@ int main(void)
 
             continue;
          }
+
+         printf("Successfully wrote files\n");
 
          filecounter++;
       }
