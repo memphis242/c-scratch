@@ -16,7 +16,17 @@ constexpr size_t MAX_STRING_SZ = 10'000;
 static volatile sig_atomic_t bUserEndedSession = false;
 
 static void handleSIGINT(int signum);
-static bool IsNulTerminated(char * str);
+
+[[nodiscard]]
+static bool isNulTerminated(const char * const str);
+
+static inline void toLowercase(char * const str);
+
+[[nodiscard]]
+static inline bool getUserInput(
+      char * buf,
+      size_t sz,
+      bool makelowercase );
 
 int main(void)
 {
@@ -162,7 +172,7 @@ int main(void)
             continue;
          }
 
-         assert(IsNulTerminated(msg));
+         assert(isNulTerminated(msg));
 
          (void)printf("%s\n", msg);
       }
@@ -172,27 +182,10 @@ int main(void)
          (void)printf("Note old encrypted content will remain!\n"
                       "New Passphrase: ");
 
-         if ( fgets(passphrase, sizeof passphrase, stdin) == nullptr )
-         {
-            // EOF encountered or I/O error encountered... Either way, exit cmd.
-            // Clear EOF indicator in stream so top level doesn't also exit
-            clearerr(stdin);
-            (void)printf("\nExiting cmd...\n");
-            break;
-         }
-
-         newlineptr = memchr(passphrase, '\n', sizeof passphrase);
-         if ( newlineptr == nullptr )
-         {
-            int c;
-            while ( (c = fgetc(stdin)) != '\n' && c != EOF );
-
-            (void)fprintf(stderr, "Error: Too many characters entered.\n");
+         bool success = getUserInput( passphrase, sizeof passphrase, false );
+         if ( !success )
             continue;
-         }
-         assert( newlineptr < (passphrase + sizeof(passphrase)) );
-         *newlineptr = '\0';
-         assert( IsNulTerminated(passphrase) );
+         assert( isNulTerminated(passphrase) );
 
          (void)printf("Successfully updated passphrase\n");
 
@@ -314,8 +307,8 @@ int main(void)
          assert(hexsz > 0);
          assert(b64 != nullptr);
          assert(b64sz > 0);
-         assert(IsNulTerminated(hex));
-         assert(IsNulTerminated(b64));
+         assert(isNulTerminated(hex));
+         assert(isNulTerminated(b64));
 
          (void)printf("- hex: %s\n", hex);
          (void)printf("- b64: %s\n", b64);
@@ -328,7 +321,7 @@ int main(void)
          (void)strcat(testkey_filename, "./testkey");
          (void)strcat(testkey_filename, (char[]){filecounter, '\0'});
          (void)strcat(testkey_filename, ".bin");
-         assert(IsNulTerminated(testkey_filename));
+         assert(isNulTerminated(testkey_filename));
 
          FILE * fd = fopen(testkey_filename, "wb");
          if ( fd == nullptr )
@@ -375,7 +368,7 @@ int main(void)
          }
 
          // Repeat for text encodings
-         assert(IsNulTerminated(testkey_filename));
+         assert(isNulTerminated(testkey_filename));
          testkey_filename[ strlen(testkey_filename) - sizeof("bin") + 1 ] = '\0';
          (void)strcat(testkey_filename, "hex");
 
@@ -508,7 +501,7 @@ int main(void)
          }
          else
          {
-            assert(IsNulTerminated(hex));
+            assert(isNulTerminated(hex));
 
             (void)printf("Hex: %s\n", hex);
          }
@@ -519,7 +512,7 @@ int main(void)
          }
          else
          {
-            assert(IsNulTerminated(hex));
+            assert(isNulTerminated(hex));
 
             (void)printf("Base64: %s\n", b64);
          }
@@ -557,7 +550,7 @@ int main(void)
             continue;
          }
 
-         if ( !IsNulTerminated(ciphertxt) )
+         if ( !isNulTerminated(ciphertxt) )
          {
             (void)fprintf(stderr, "ciphertxt is not terminated. Aborting cmd...\n");
             continue;
@@ -627,11 +620,60 @@ static void handleSIGINT(int signum)
    bUserEndedSession = true;
 }
 
-static bool IsNulTerminated(char * str)
+static bool isNulTerminated(const char * const str)
 {
    for ( size_t i = 0 ; i < MAX_STRING_SZ; ++i )
       if ( str[i] == '\0' )
          return true;
 
    return false;
+}
+
+static inline void toLowercase(char * const str)
+{
+   assert(str != nullptr);
+   assert(isNulTerminated(str));
+
+   for ( char * ptr = str; ptr != nullptr && *ptr != '\0'; ++ptr )
+      *ptr = (char)tolower(*ptr); // Assume no EOF in string...
+}
+
+[[nodiscard]]
+static inline bool getUserInput(
+      char * buf,
+      size_t sz,
+      bool makelowercase)
+{
+   if ( fgets(buf, (int)sz, stdin) == nullptr )
+   {
+      // Either EOF encountered /wo other characters preceding it or I/O
+      // interruption occured. Either way, time to exit gracefully.
+      clearerr(stdin);
+      printf("\nExiting command...\n");
+      return false;
+   }
+
+   // Replace newline /w null-termination
+   char * newlineptr = memchr(buf, '\n', sz);
+   if ( nullptr == newlineptr )
+   {
+      // There were more characters than the size of the input buffer to fgets()
+      // Clear the remaining characters in stdin...
+      int c;
+      while ( (c = fgetc(stdin)) != '\n' && c != EOF );
+
+      // Take this as an invalid input and request the user to try again.
+      (void)fprintf( stderr,
+               "Error: Too many characters in user input encountered.\n"
+               "Please try again.\n" );
+
+      return false;
+   }
+   assert( newlineptr < (buf + sz) );
+   *newlineptr = '\0';
+
+   if ( makelowercase )
+      toLowercase(buf);
+
+   return true;
 }
