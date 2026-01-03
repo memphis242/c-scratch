@@ -45,6 +45,8 @@ int main(void)
    size_t keysz = 0;
    char * b64 = nullptr;
    size_t b64sz = 0;
+   constexpr int b64variant = sodium_base64_VARIANT_ORIGINAL;
+   constexpr char b64variantstr[] = "sodium_base64_VARIANT_ORIGINAL";
    char * hex = nullptr;
    size_t hexsz = 0;
    uint8_t * salt = nullptr;
@@ -232,7 +234,6 @@ int main(void)
          (void)sodium_bin2hex( salthex, salthexsz,
                                salt, saltsz );
 
-         constexpr int b64variant = sodium_base64_VARIANT_ORIGINAL;
          size_t saltb64sz = sodium_base64_ENCODED_LEN(saltsz, b64variant);
          char * saltb64 = malloc( saltb64sz * sizeof(char) );
          if ( saltb64 == nullptr )
