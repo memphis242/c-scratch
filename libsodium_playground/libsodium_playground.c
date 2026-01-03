@@ -578,6 +578,31 @@ int main(void)
          (void)printf("Not implemented yet.\n");
       }
 
+      else if ( strcmp(cmd, "bintob64") == 0 )
+      {
+         // TODO
+         (void)printf("Not implemented yet.\n");
+      }
+
+      else if ( strcmp(cmd, "bintohex") == 0 )
+      {
+         // TODO
+         (void)printf("Not implemented yet.\n");
+      }
+
+      else if ( strcmp(cmd, "hextob64") == 0 )
+      {
+         char hexbuf[256] = {0};
+
+         bool success = getUserInput(hexbuf, sizeof hexbuf, true);
+      }
+
+      else if ( strcmp(cmd, "b64tohex") == 0 )
+      {
+         // TODO
+         (void)printf("Not implemented yet.\n");
+      }
+
       else if ( strcmp(cmd, "load") == 0 )
       {
          // TODO
