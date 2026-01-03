@@ -594,7 +594,46 @@ int main(void)
       {
          char hexbuf[256] = {0};
 
+         (void)printf("Hex: ");
+         (void)fflush(stdout);
+
          bool success = getUserInput(hexbuf, sizeof hexbuf, true);
+         if ( !success )
+            continue;
+         assert(isNulTerminated(hexbuf));
+
+         size_t hexlen = strlen(hexbuf);
+         uint8_t binbuf[ (sizeof(hexbuf) + 1) / 2 ];
+         const char * hexend = &hexbuf[0];
+         size_t binlen;
+
+         sodiumrc = sodium_hex2bin( binbuf, sizeof binbuf,
+                                    hexbuf, hexlen,
+                                    nullptr, // characters to ignore
+                                    &binlen, &hexend );
+
+         assert(hexend != nullptr);
+         assert(sodiumrc == 0); // Either I provided too small a binbuf or hex_end wasn't provided
+         if ( *hexend != '\0'
+              || (binlen < (hexlen/2) || binlen > (hexlen+1)/2 ) )
+         {
+            (void)fprintf( stderr,
+                     "Error: An invalid hex character was encountered: '%c' @ idx: %ti\n"
+                     "Unable to properly decode. Aborting cmd...\n",
+                     *hexend, (ptrdiff_t)(hexend - &hexbuf[0]) );
+            continue;
+         }
+
+         size_t b64len = sodium_base64_ENCODED_LEN(binlen, b64variant);
+         char b64buf[b64len];
+
+         (void)sodium_bin2base64( b64buf, sizeof b64buf,
+                                  binbuf, binlen,
+                                  b64variant );
+
+         assert(isNulTerminated(b64buf));
+
+         (void)printf("B64: %s\n", b64buf);
       }
 
       else if ( strcmp(cmd, "b64tohex") == 0 )
