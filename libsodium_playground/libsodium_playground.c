@@ -249,9 +249,10 @@ int main(void)
                                   b64variant );
 
          (void)printf("Using salt:\n"
-                      "- b64: %s\n"
-                      "- hex: %s\n",
-                      saltb64, salthex );
+                      "- hex: %s\n"
+                      "- b64: %s\n",
+                      salthex,
+                      saltb64 );
 
          unsigned long long int opslimit = crypto_pwhash_OPSLIMIT_SENSITIVE;
          char opslimitstr[] = "crypto_pwhash_OPSLIMIT_SENSITIVE";
