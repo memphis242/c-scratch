@@ -20,14 +20,16 @@ enum MainRetCode
    MAIN_RETCODE_FAILED_TO_ALARM,
 };
 
+static void handleSIGINT(int signum);
+
 int main(int argc, char * argv[])
 {
-   int retcode;
+   int rc;
 
    // Check argument correctness
    if ( argc != 2 )
    {
-      fprintf( stderr,
+      (void)fprintf( stderr,
                "Need to pass in a time argument in seconds.\n"
                "Please try again.\n" );
       return (int)MAIN_RETCODE_MISSING_ARGS;
@@ -52,7 +54,7 @@ int main(int argc, char * argv[])
 
    if ( *endptr != '\0' )
    {
-      fprintf( stderr,
+      (void)fprintf( stderr,
                "Error: Invalid time argument: %s\n"
                "strtol() detected an invalid char at string idx %td : '%c'\n",
                argv[1],
@@ -62,7 +64,7 @@ int main(int argc, char * argv[])
    }
    else if ( ERANGE == errno )
    {
-      fprintf( stderr,
+      (void)fprintf( stderr,
                "Error: Time amount out-of-bounds: %s\n"
                "strtol() returned: %ld. errno: %s (%d)\n",
                argv[1],
@@ -71,12 +73,29 @@ int main(int argc, char * argv[])
       return (int)MAIN_RETCODE_TIME_OOB;
    }
 
+   // Register handler for SIGINT so that we can tell how much time was remaining.
+   // Make sure the SA_RESTART flag is not set for this signal.
+   struct sigaction sa_cfg = {0};
+   sigemptyset(&sa_cfg.sa_mask);
+   sa_cfg.sa_handler = handleSIGINT;
+   rc = sigaction( SIGINT, &sa_cfg, nullptr /* old signal cfg */ );
+   if ( rc != 0 )
+   {
+      (void)fprintf( stderr,
+               "Warning: sigaction() failed to register interrupt signal handler.\n"
+               "Returned: %d, errno: %s (%d): %s\n"
+               "You won't be able to stop the program gracefully /w Ctrl+C, although \n"
+               "Ctrl+C will still terminate the program.\n",
+               rc, strerrorname_np(errno), errno, strerror(errno) );
+   }
+
    // Sleep for user's request time...
    unsigned int time_remaining = sleep(seconds);
    if ( time_remaining > 0 )
    {
       (void)fprintf( stderr,
-               "sleep() was interrupted by a signal that was not masked.\n"
+               "sleep() was interrupted by a signal that was not masked\n"
+               "and SA_RESTART was not set to restart the sleep() call.\n
                "Time remaining: %u seconds\n",
                time_remaining );
 
@@ -86,9 +105,9 @@ int main(int argc, char * argv[])
    // ------------------------------ Alarm Time! ------------------------------
    // Unfortunately, the '\a' tone is brief and frequently heard sound, which is
    // makes it harder to notice...
-   //retcode = printf("\a");
+   //rc = printf("\a");
    //fflush(stdout);
-   //if ( retcode < 0 )
+   //if ( rc < 0 )
    //{
    //   fprintf( stderr,
    //            "Failed to trigger alarm! errno: %s (%d)\n",
@@ -99,10 +118,10 @@ int main(int argc, char * argv[])
 
    // ... so instead, I'll invoke a shell cmd as a convenient alternative to
    // play a .wav sound file...
-   retcode = system("ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav");
-   if ( retcode == -1 )
+   rc = system("ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav");
+   if ( rc == -1 )
    {
-      fprintf( stderr,
+      (void)fprintf( stderr,
                "system(\"ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav\"): "
                "Child process could not be created or status could not be retrieved. errno: %s (%d)\n",
                strerror(errno), errno );
@@ -111,21 +130,29 @@ int main(int argc, char * argv[])
    }
 
 #  ifdef DEBUG
-   if ( WIFEXITED(retcode) )
+   if ( WIFEXITED(rc) )
    {
-      printf( "system() exited /w status: %d\n", WEXITSTATUS(retcode) );
+      (void)printf( "system() exited /w status: %d\n", WEXITSTATUS(rc) );
    }
 #  endif
 
-   else if ( WIFSIGNALED(retcode) )
+   else if ( WIFSIGNALED(rc) )
    {
-      fprintf( stderr, "system() interrupted by signal %d\n", WTERMSIG(retcode) );
+      (void)fprintf( stderr, "system() interrupted by signal %d\n", WTERMSIG(rc) );
       return MAIN_RETCODE_FAILED_TO_ALARM;
    }
-   else if ( !WIFEXITED(retcode) )
+   else if ( !WIFEXITED(rc) )
    {
-      fprintf( stderr, "system() failed somehow... Returned: %d\n", retcode );
+      (void)fprintf( stderr, "system() failed somehow... Returned: %d\n", rc );
    }
 
    return (int)MAIN_RETCODE_FINE;
+}
+
+static void handleSIGINT(int signum)
+{
+   (void)signum;
+
+   // Do nothing because we just want to make sure the program catches the signal
+   // and doesn't terminate.
 }

@@ -5,5 +5,6 @@ gcc \
    -Wall -Wextra \
    -Wpedantic -pedantic-errors \
    -D_POSIX_C_SOURCE=200809L \
+   -D_GNU_SOURCE \
    -o alarmtimer \
    alarmtimer.c
