@@ -20,6 +20,8 @@ enum MainRetCode
    MAIN_RETCODE_FAILED_TO_ALARM,
 };
 
+static sig_atomic_t user_stopped_timer = false;
+
 static void handleSIGINT(int signum);
 
 int main(int argc, char * argv[])
@@ -90,17 +92,33 @@ int main(int argc, char * argv[])
    }
 
    // Sleep for user's request time...
-   unsigned int time_remaining = sleep(seconds);
-   if ( time_remaining > 0 )
+   for ( unsigned int i = 0; i < seconds; i++ )
    {
-      (void)fprintf( stderr,
-               "sleep() was interrupted by a signal that was not masked\n"
-               "and SA_RESTART was not set to restart the sleep() call.\n
-               "Time remaining: %u seconds\n",
-               time_remaining );
+      unsigned int time_remaining = sleep(1);
+      if ( time_remaining > 0 )
+      {
+         (void)fprintf( stderr,
+                  "sleep() was interrupted by a signal that was not masked\n"
+                  "and SA_RESTART was not set to restart the sleep() call.\n"
+                  "Time remaining: ≈ %lu seconds\n",
+                  seconds - i );
 
-      return MAIN_RETCODE_SLEEP_INTERRUPTED;
+         return MAIN_RETCODE_SLEEP_INTERRUPTED;
+      }
+      else if ( user_stopped_timer )
+      {
+         (void)fprintf( stderr,
+                  "\nUser stopped the timer.\n"
+                  "Time remaining: ≈ %lu seconds\n",
+                  seconds - i );
+
+         return MAIN_RETCODE_SLEEP_INTERRUPTED;
+      }
+
+      (void)printf("\r%4lu secs remaining", seconds - i);
+      (void)fflush(stdout);
    }
+   (void)puts("");
 
    // ------------------------------ Alarm Time! ------------------------------
    // Unfortunately, the '\a' tone is brief and frequently heard sound, which is
@@ -152,7 +170,5 @@ int main(int argc, char * argv[])
 static void handleSIGINT(int signum)
 {
    (void)signum;
-
-   // Do nothing because we just want to make sure the program catches the signal
-   // and doesn't terminate.
+   user_stopped_timer = true;
 }
