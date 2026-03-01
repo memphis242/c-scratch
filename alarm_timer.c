@@ -93,7 +93,13 @@ int main(int argc, char * argv[])
    }
 
    // Start the timer!
-   (void)alarm(seconds); // return value doesn't matter...
+   // Arrange for SIGALRM to be delivered in 'seconds' seconds
+   unsigned int remaining_time_for_last_alarm = alarm(seconds);
+   // There shouldn't be any previously scheduled alarm for this process...
+   assert(remaining_time_for_last_alarm == 0);
+   // FIXME: There's got to be a better way to wait rather than spinning...
+   //        Note that sleep() and alarm() share the same objects, so programs
+   //        should not mix calls between them.
    while ( !bAlarm ); // wait for SIGALRM...
 
    // ------------------------------ Alarm Time! ------------------------------
