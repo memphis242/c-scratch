@@ -10,28 +10,20 @@
 #include <stddef.h>
 #include <limits.h>
 
-constexpr int SIGACTION_SUCCESS = 0;
-
-static volatile sig_atomic_t bAlarm = false;
-
-void handleSIGALRM(int signum)
-{
-   (void)signum; // Only one signal associated to this handler
-   bAlarm = true;
-}
-
 enum MainRetCode
 {
    MAIN_RETCODE_FINE,
    MAIN_RETCODE_MISSING_ARGS,
    MAIN_RETCODE_MALFORMED_ARG,
    MAIN_RETCODE_TIME_OOB,
-   MAIN_RETCODE_SIGACTION_FAILED,
+   MAIN_RETCODE_SLEEP_INTERRUPTED,
    MAIN_RETCODE_FAILED_TO_ALARM,
 };
 
 int main(int argc, char * argv[])
 {
+   int retcode;
+
    // Check argument correctness
    if ( argc != 2 )
    {
@@ -79,28 +71,17 @@ int main(int argc, char * argv[])
       return (int)MAIN_RETCODE_TIME_OOB;
    }
 
-   // Register signal handler
-   struct sigaction sa_cfg;
-   memset(&sa_cfg, 0x00, sizeof sa_cfg);
-   sa_cfg.sa_handler = handleSIGALRM;
-   int retcode = sigaction(SIGALRM, &sa_cfg, NULL);
-   if ( retcode != SIGACTION_SUCCESS )
+   // Sleep for user's request time...
+   unsigned int time_remaining = sleep(seconds);
+   if ( time_remaining > 0 )
    {
-      fprintf( stderr,
-               "sigaction(SIGALRM, &sa_cfg, NULL) failed! errno: %s (%d)",
-               strerror(errno), errno );
-      return (int)MAIN_RETCODE_SIGACTION_FAILED;
-   }
+      (void)fprintf( stderr,
+               "sleep() was interrupted by a signal that was not masked.\n"
+               "Time remaining: %u seconds\n",
+               time_remaining );
 
-   // Start the timer!
-   // Arrange for SIGALRM to be delivered in 'seconds' seconds
-   unsigned int remaining_time_for_last_alarm = alarm(seconds);
-   // There shouldn't be any previously scheduled alarm for this process...
-   assert(remaining_time_for_last_alarm == 0);
-   // FIXME: There's got to be a better way to wait rather than spinning...
-   //        Note that sleep() and alarm() share the same objects, so programs
-   //        should not mix calls between them.
-   while ( !bAlarm ); // wait for SIGALRM...
+      return MAIN_RETCODE_SLEEP_INTERRUPTED;
+   }
 
    // ------------------------------ Alarm Time! ------------------------------
    // Unfortunately, the '\a' tone is brief and frequently heard sound, which is
@@ -126,7 +107,7 @@ int main(int argc, char * argv[])
                "Child process could not be created or status could not be retrieved. errno: %s (%d)\n",
                strerror(errno), errno );
 
-      return MAIN_RETCODE_FAILED_TO_ALARM;
+      return (int)MAIN_RETCODE_FAILED_TO_ALARM;
    }
 
 #  ifdef DEBUG
