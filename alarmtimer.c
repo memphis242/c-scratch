@@ -208,7 +208,8 @@ int main(int argc, char * argv[])
 
    // ... so instead, I'll invoke a shell cmd as a convenient alternative to
    // play a .wav sound file...
-   rc = system("ffplay -nodisp -autoexit -loglevel quiet mixkit-bell-notification-933.wav");
+   // FIXME: This also does not seem to work when the program is run from $HOME/bin/
+   rc = system("ffplay -nodisp -autoexit -loglevel quiet ./mixkit-bell-notification-933.wav");
    if ( rc == -1 )
    {
       (void)fprintf( stderr,
