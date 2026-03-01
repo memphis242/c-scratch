@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
          return MAIN_RETCODE_SLEEP_INTERRUPTED;
       }
 
-      (void)printf("\r%5lu secs remaining", seconds - i);
+      (void)printf("\r%5lu secs remaining", seconds - i - 1);
       (void)fflush(stdout);
    }
    (void)puts("");
