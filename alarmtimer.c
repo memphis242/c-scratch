@@ -10,12 +10,23 @@
 #include <stddef.h>
 #include <limits.h>
 
+// More than a day and this would be a questionable timer usecase...
+constexpr long int MAX_TIME = 60 * 60 * 24;
+
+constexpr unsigned long int NUM_SECS_IN_YEAR = 60*60*24*365;
+constexpr unsigned long int NUM_SECS_IN_WEEK = 60*60*24*7;
+constexpr unsigned long int NUM_SECS_IN_DAY  = 60*60*24;
+constexpr unsigned long int NUM_SECS_IN_HOUR = 60*60;
+constexpr unsigned long int NUM_SECS_IN_MIN  = 60;
+
 enum MainRetCode
 {
    MAIN_RETCODE_FINE,
    MAIN_RETCODE_MISSING_ARGS,
    MAIN_RETCODE_MALFORMED_ARG,
-   MAIN_RETCODE_TIME_OOB,
+   MAIN_RETCODE_STRTOL_OOB,
+   MAIN_RETCODE_TOO_MUCH_TIME,
+   MAIN_RETCODE_ZERO_TIMEOUT_REQUESTED,
    MAIN_RETCODE_SLEEP_INTERRUPTED,
    MAIN_RETCODE_FAILED_TO_ALARM,
 };
@@ -67,12 +78,73 @@ int main(int argc, char * argv[])
    else if ( ERANGE == errno )
    {
       (void)fprintf( stderr,
-               "Error: Time amount out-of-bounds: %s\n"
+               "Error: Input amount out-of-bounds for strtol(): %s\n"
                "strtol() returned: %ld. errno: %s (%d)\n",
                argv[1],
                seconds, strerror(errno), errno );
 
-      return (int)MAIN_RETCODE_TIME_OOB;
+      return (int)MAIN_RETCODE_STRTOL_OOB;
+   }
+   else if ( seconds >= MAX_TIME )
+   {
+      unsigned long int num_years = 0;
+      unsigned long int num_weeks = 0;
+      unsigned long int num_days  = 0;
+      unsigned long int num_hours = 0;
+      unsigned long int num_mins  = 0;
+      unsigned long int num_secs  = seconds;
+
+      // Convert seconds to X years, Y weeks, Z days, A hours, B minutes, C seconds format
+      if ( num_secs >= NUM_SECS_IN_YEAR )
+      {
+         num_years = num_secs / NUM_SECS_IN_YEAR;
+         num_secs %= NUM_SECS_IN_YEAR;
+      }
+
+      if ( num_secs >= NUM_SECS_IN_WEEK )
+      {
+         num_weeks = num_secs / NUM_SECS_IN_WEEK;
+         num_secs %= NUM_SECS_IN_WEEK;
+      }
+
+      if ( num_secs >= NUM_SECS_IN_DAY )
+      {
+         num_days  = num_secs / NUM_SECS_IN_DAY;
+         num_secs %= NUM_SECS_IN_DAY;
+      }
+
+      if ( num_secs >= NUM_SECS_IN_HOUR )
+      {
+         num_hours = num_secs / NUM_SECS_IN_HOUR;
+         num_secs %= NUM_SECS_IN_HOUR;
+      }
+
+      if ( num_secs >= NUM_SECS_IN_MIN )
+      {
+         num_mins  = num_secs / NUM_SECS_IN_MIN;
+         num_secs %= NUM_SECS_IN_MIN;
+      }
+
+      (void)fprintf( stderr,
+               "Error: Too much time is being asked for:\n"
+               "    %lu years, %lu weeks, %lu days, %lu hours, %lu minutes, %lu seconds\n"
+               "You probably don't want to wait for more than a day.\n",
+               num_years, num_weeks, num_days, num_hours, num_mins, num_secs );
+
+      return (int)MAIN_RETCODE_TOO_MUCH_TIME;
+   }
+   else if ( seconds < 0 )
+   {
+      (void)fprintf( stderr,
+               "Error: Can't ask for a negative timeout: %lu.\n",
+               seconds );
+
+      return (int)MAIN_RETCODE_TOO_MUCH_TIME;
+   }
+   else if ( seconds == 0 )
+   {
+      (void)fprintf(stderr, "Error: 0 timeout is invalid\n");
+      return (int)MAIN_RETCODE_ZERO_TIMEOUT_REQUESTED;
    }
 
    // Register handler for SIGINT so that we can tell how much time was remaining.
@@ -115,7 +187,7 @@ int main(int argc, char * argv[])
          return MAIN_RETCODE_SLEEP_INTERRUPTED;
       }
 
-      (void)printf("\r%4lu secs remaining", seconds - i);
+      (void)printf("\r%lu secs remaining", seconds - i);
       (void)fflush(stdout);
    }
    (void)puts("");
